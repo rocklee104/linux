@@ -527,16 +527,20 @@ static struct inode *V2_minix_iget(struct inode *inode)
 /*
  * The global function to read an inode.
  */
+/* 通过ino获取struct inode* */
 struct inode *minix_iget(struct super_block *sb, unsigned long ino)
 {
 	struct inode *inode;
 
+	/* 在minix_new_inode时,会将新创建的inode hash,优先搜索这个hash */
 	inode = iget_locked(sb, ino);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+	/* 如果这个inode不是新分配的,表示其中的成员都已经填充过了,直接返回 */
 	if (!(inode->i_state & I_NEW))
 		return inode;
 
+	/* 如果iget_locked中分配了新的inode,需要用raw inode填充vfs inode */
 	if (INODE_VERSION(inode) == MINIX_V1)
 		return V1_minix_iget(inode);
 	else

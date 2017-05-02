@@ -206,6 +206,7 @@ static int ovl_create_upper(struct dentry *dentry, struct inode *inode,
 	err = PTR_ERR(newdentry);
 	if (IS_ERR(newdentry))
 		goto out_unlock;
+	/* 在实际文件系统中创建文件 */
 	err = ovl_create_real(udir, newdentry, attr, hardlink, false);
 	if (err)
 		goto out_dput;

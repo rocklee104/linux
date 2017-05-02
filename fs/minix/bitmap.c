@@ -213,6 +213,7 @@ struct inode *minix_new_inode(const struct inode *dir, umode_t mode, int *error)
 {
 	struct super_block *sb = dir->i_sb;
 	struct minix_sb_info *sbi = minix_sb(sb);
+	/* 从minixfs中的inode缓存池中分配一个inode */
 	struct inode *inode = new_inode(sb);
 	struct buffer_head * bh;
 	int bits_per_zone = 8 * sb->s_blocksize;
@@ -226,6 +227,7 @@ struct inode *minix_new_inode(const struct inode *dir, umode_t mode, int *error)
 	j = bits_per_zone;
 	bh = NULL;
 	*error = -ENOSPC;
+	/* 置位imap中空闲的bit */
 	spin_lock(&bitmap_lock);
 	for (i = 0; i < sbi->s_imap_blocks; i++) {
 		bh = sbi->s_imap[i];
@@ -256,6 +258,7 @@ struct inode *minix_new_inode(const struct inode *dir, umode_t mode, int *error)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = current_time(inode);
 	inode->i_blocks = 0;
 	memset(&minix_i(inode)->u, 0, sizeof(minix_i(inode)->u));
+	/* 以ino hash inode */
 	insert_inode_hash(inode);
 	mark_inode_dirty(inode);
 

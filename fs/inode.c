@@ -915,6 +915,10 @@ struct inode *new_inode(struct super_block *sb)
 
 	spin_lock_prefetch(&sb->s_inode_list_lock);
 
+	/*
+	 * 文件系统如果本身维护了一个缓存池,就从这个缓存池中分配一个inode,
+	 * 没有的话就分配一个inode内存空间
+	 */
 	inode = new_inode_pseudo(sb);
 	if (inode)
 		inode_sb_list_add(inode);

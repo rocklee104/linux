@@ -10,6 +10,7 @@ static int add_nondir(struct dentry *dentry, struct inode *inode)
 {
 	int err = minix_add_link(dentry, inode);
 	if (!err) {
+		/* 关联dentry和inode */
 		d_instantiate(dentry, inode);
 		return 0;
 	}
@@ -47,6 +48,7 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, umode_t mode, 
 	inode = minix_new_inode(dir, mode, &error);
 
 	if (inode) {
+		/* 根据文件类型不同,设置不同的操作函数 */
 		minix_set_inode(inode, rdev);
 		mark_inode_dirty(inode);
 		error = add_nondir(dentry, inode);

@@ -219,6 +219,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	 * This code plays outside i_size, so it locks the page
 	 * to protect that region.
 	 */
+	/* 查找能插入目录项的地方 */
 	for (n = 0; n <= npages; n++) {
 		char *limit, *dir_end;
 
@@ -261,6 +262,7 @@ int minix_add_link(struct dentry *dentry, struct inode *inode)
 	return -EINVAL;
 
 got_it:
+	/* 插入目录项 */
 	pos = page_offset(page) + p - (char *)page_address(page);
 	err = minix_prepare_chunk(page, pos, sbi->s_dirsize);
 	if (err)
@@ -447,6 +449,7 @@ struct minix_dir_entry * minix_dotdot (struct inode *dir, struct page **p)
 	return de;
 }
 
+/* 从dentry->目录项->ino */
 ino_t minix_inode_by_name(struct dentry *dentry)
 {
 	struct page *page;

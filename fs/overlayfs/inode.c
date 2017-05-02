@@ -337,7 +337,9 @@ struct inode *ovl_new_inode(struct super_block *sb, umode_t mode, dev_t rdev)
 {
 	struct inode *inode;
 
+	/* overlayfs本身没有实现alloc_inode,仅仅使用vfs通用的alloc_inode分配一块inode内存 */
 	inode = new_inode(sb);
+	/* 根据文件类型分配不同的操作函数 */
 	if (inode)
 		ovl_fill_inode(inode, mode, rdev);
 
