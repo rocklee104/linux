@@ -20,6 +20,7 @@ struct ovl_lookup_data {
 	bool is_dir;
 	bool opaque;
 	bool stop;
+	/* 是否是最后一个layer */
 	bool last;
 	char *redirect;
 };
@@ -126,10 +127,13 @@ static int ovl_lookup_single(struct dentry *base, struct ovl_lookup_data *d,
 	}
 	if (!d_can_lookup(this)) {
 		d->stop = true;
+		/* 对于不能lookup的目录,直接返回NULL */
 		if (d->is_dir)
 			goto put_and_out;
+		/* 对于non-dir来说,不能继续lookup下去了 */
 		goto out;
 	}
+	/* d_can_lookup,一定是目录 */
 	d->is_dir = true;
 	if (!d->last && ovl_is_opaquedir(this)) {
 		d->stop = d->opaque = true;
@@ -152,6 +156,7 @@ out_err:
 	return err;
 }
 
+/* base是父目录,这个目录可能有多层,从所有的layer中获取符合d的dentry */
 static int ovl_lookup_layer(struct dentry *base, struct ovl_lookup_data *d,
 			    struct dentry **ret)
 {
@@ -160,14 +165,20 @@ static int ovl_lookup_layer(struct dentry *base, struct ovl_lookup_data *d,
 	struct dentry *dentry = NULL;
 	int err;
 
+	/* 处理相对路径 */
 	if (d->name.name[0] != '/')
 		return ovl_lookup_single(base, d, d->name.name, d->name.len,
 					 0, "", ret);
 
+	/* 绝对路径 */
 	while (!IS_ERR_OR_NULL(base) && d_can_lookup(base)) {
+		/* '/'之后的第一个字符 */
 		const char *s = d->name.name + d->name.len - rem;
+		/* 下一个'/' */
 		const char *next = strchrnul(s, '/');
+		/* 两个'/'之间字符的长度 */
 		size_t thislen = next - s;
+		/* 只有next[0] == NULL的时候,end = 1 */
 		bool end = !next[0];
 
 		/* Verify we did not go off the rails */
@@ -219,6 +230,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 	struct ovl_entry *oe;
 	const struct cred *old_cred;
 	struct ovl_fs *ofs = dentry->d_sb->s_fs_info;
+	/* 父目录的ovl_entry */
 	struct ovl_entry *poe = dentry->d_parent->d_fsdata;
 	struct path *stack = NULL;
 	struct dentry *upperdir, *upperdentry = NULL;
@@ -242,6 +254,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 		return ERR_PTR(-ENAMETOOLONG);
 
 	old_cred = ovl_override_creds(dentry->d_sb);
+	/* 获取父目录的upper */
 	upperdir = ovl_upperdentry_dereference(poe);
 	if (upperdir) {
 		err = ovl_lookup_layer(upperdir, &d, &upperdentry);

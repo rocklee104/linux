@@ -325,6 +325,7 @@ static int ovl_copy_up_locked(struct dentry *workdir, struct dentry *upperdir,
 
 	newdentry = dget(tmpfile ? upper : temp);
 	ovl_dentry_update(dentry, newdentry);
+    /* 每次copy up将non-dir inode添加到hash中 */
 	ovl_inode_update(d_inode(dentry), d_inode(newdentry));
 
 	/* Restore timestamps on parent (best effort) */
