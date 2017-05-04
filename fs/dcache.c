@@ -1785,6 +1785,7 @@ type_determined:
 	return add_flags;
 }
 
+/* __d_add比__d_instantiate多了__d_rehash */
 static void __d_instantiate(struct dentry *dentry, struct inode *inode)
 {
 	unsigned add_flags = d_flags_for_inode(inode);
@@ -2525,7 +2526,7 @@ void __d_lookup_done(struct dentry *dentry)
 EXPORT_SYMBOL(__d_lookup_done);
 
 /* inode->i_lock held if inode is non-NULL */
-
+/* 相对于__d_instantiate,多了__d_rehash,将dentry加入hash */
 static inline void __d_add(struct dentry *dentry, struct inode *inode)
 {
 	struct inode *dir = NULL;
@@ -2538,8 +2539,10 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
 	}
 	if (inode) {
 		unsigned add_flags = d_flags_for_inode(inode);
+		/* 将dentry加入inode的hash table */
 		hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
 		raw_write_seqcount_begin(&dentry->d_seq);
+		/* dentry->d_inode指向inode并设置flag */
 		__d_set_inode_and_type(dentry, inode, add_flags);
 		raw_write_seqcount_end(&dentry->d_seq);
 		fsnotify_update_flags(dentry);
@@ -2560,7 +2563,11 @@ static inline void __d_add(struct dentry *dentry, struct inode *inode)
  * This adds the entry to the hash queues and initializes @inode.
  * The entry was actually filled in earlier during d_alloc().
  */
-
+/*
+ * 文件系统lookup时调用.在lookup的使用会调用d_alloc分配一个dentry,并初始化.
+ * 但这个dentry并没有被加入hash table.所以文件系统lookup中需要调用d_add,而
+ * 不能使用d_instantiate
+ */
 void d_add(struct dentry *entry, struct inode *inode)
 {
 	if (inode) {

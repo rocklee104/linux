@@ -47,8 +47,11 @@ struct ovl_readdir_data {
 	bool d_type_supported;
 };
 
+/* 目录使用的缓存 */
 struct ovl_dir_file {
+	/* 表示目录不是merge出来的,而是实实在在存在的 */
 	bool is_real;
+	/* 存在upperdir中 */
 	bool is_upper;
 	struct ovl_dir_cache *cache;
 	struct list_head *cursor;
@@ -178,6 +181,7 @@ static void ovl_cache_put(struct ovl_dir_file *od, struct dentry *dentry)
 
 	WARN_ON(cache->refcount <= 0);
 	cache->refcount--;
+	/* 统计计数为0的时候,就释放dir cache */
 	if (!cache->refcount) {
 		if (ovl_dir_cache(dentry) == cache)
 			ovl_set_dir_cache(dentry, NULL);
@@ -327,10 +331,12 @@ static struct ovl_dir_cache *ovl_cache_get(struct dentry *dentry)
 	struct ovl_dir_cache *cache;
 
 	cache = ovl_dir_cache(dentry);
+	/* 缓存已经存在,增加统计计数,直接返回 */
 	if (cache && ovl_dentry_version_get(dentry) == cache->version) {
 		cache->refcount++;
 		return cache;
 	}
+
 	ovl_set_dir_cache(dentry, NULL);
 
 	cache = kzalloc(sizeof(struct ovl_dir_cache), GFP_KERNEL);
@@ -353,21 +359,26 @@ static struct ovl_dir_cache *ovl_cache_get(struct dentry *dentry)
 	return cache;
 }
 
+/* overlay readdir操作 */
 static int ovl_iterate(struct file *file, struct dir_context *ctx)
 {
+	/* 获取到ovl_dir_open创建的ovl_dir_file */
 	struct ovl_dir_file *od = file->private_data;
 	struct dentry *dentry = file->f_path.dentry;
 	struct ovl_cache_entry *p;
 
+	/* 当ctx->pos == 0的时候需要清除目录缓存 */
 	if (!ctx->pos)
 		ovl_dir_reset(file);
 
 	if (od->is_real)
 		return iterate_dir(od->realfile, ctx);
 
+	/* 目录之前没有被打开过,本次readdir后会将目录项缓存起来 */
 	if (!od->cache) {
 		struct ovl_dir_cache *cache;
 
+		/* 读取目录项,建立目录项缓存 */
 		cache = ovl_cache_get(dentry);
 		if (IS_ERR(cache))
 			return PTR_ERR(cache);
@@ -495,15 +506,19 @@ static int ovl_dir_open(struct inode *inode, struct file *file)
 	if (!od)
 		return -ENOMEM;
 
+	/* 获取到realpath */
 	type = ovl_path_real(file->f_path.dentry, &realpath);
+	/* 通过path获取到struct file * */
 	realfile = ovl_path_open(&realpath, file->f_flags);
 	if (IS_ERR(realfile)) {
 		kfree(od);
 		return PTR_ERR(realfile);
 	}
 	od->realfile = realfile;
+	/* 不是merge的,那么就一定是upper或者lower中的目录,是实实在在存在的目录 */
 	od->is_real = !OVL_TYPE_MERGE(type);
 	od->is_upper = OVL_TYPE_UPPER(type);
+	/* 将ovl_dir_file保持到private_data中 */
 	file->private_data = od;
 
 	return 0;
