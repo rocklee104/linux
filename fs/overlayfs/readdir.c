@@ -333,10 +333,12 @@ static struct ovl_dir_cache *ovl_cache_get(struct dentry *dentry)
 	cache = ovl_dir_cache(dentry);
 	/* 缓存已经存在,增加统计计数,直接返回 */
 	if (cache && ovl_dentry_version_get(dentry) == cache->version) {
+		/* 有多少个进程共用了这个cache */
 		cache->refcount++;
 		return cache;
 	}
 
+	/* 如果cache不存在,或者ovl_entry的version和ovl_dir_cache的verion不相等. */
 	ovl_set_dir_cache(dentry, NULL);
 
 	cache = kzalloc(sizeof(struct ovl_dir_cache), GFP_KERNEL);
@@ -362,7 +364,10 @@ static struct ovl_dir_cache *ovl_cache_get(struct dentry *dentry)
 /* overlay readdir操作 */
 static int ovl_iterate(struct file *file, struct dir_context *ctx)
 {
-	/* 获取到ovl_dir_open创建的ovl_dir_file */
+	/*
+	 * 获取到ovl_dir_open创建的ovl_dir_file.每个file都有各自的ovl_dir_file,
+	 * 但是cache共用.
+	 */
 	struct ovl_dir_file *od = file->private_data;
 	struct dentry *dentry = file->f_path.dentry;
 	struct ovl_cache_entry *p;
@@ -495,6 +500,7 @@ static int ovl_dir_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+/* file是进程相关的,每一个进程读取一个目录的时候,各自都会获取一个struct ovl_dir_file */
 static int ovl_dir_open(struct inode *inode, struct file *file)
 {
 	struct path realpath;

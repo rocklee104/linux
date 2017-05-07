@@ -37,6 +37,7 @@ struct ovl_entry {
 	struct ovl_dir_cache *cache;
 	union {
 		struct {
+			/* 目录使用,如果目录中有增加或者减少以及rename,这version递增 */
 			u64 version;
 			const char *redirect;
 			bool opaque;
