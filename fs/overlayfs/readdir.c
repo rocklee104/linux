@@ -54,6 +54,7 @@ struct ovl_dir_file {
 	/* 存在upperdir中 */
 	bool is_upper;
 	struct ovl_dir_cache *cache;
+	/* 配合seekdir使用,指向cache链表中entries的offset第个成员 */
 	struct list_head *cursor;
 	struct file *realfile;
 	struct file *upperfile;
@@ -268,6 +269,7 @@ static void ovl_dir_reset(struct file *file)
 	enum ovl_path_type type = ovl_path_type(dentry);
 
 	if (cache && ovl_dentry_version_get(dentry) != cache->version) {
+		/* 当有文件增加/删除/rename的时候,需要清除缓存 */
 		ovl_cache_put(od, dentry);
 		od->cache = NULL;
 		od->cursor = NULL;
@@ -372,14 +374,23 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 	struct dentry *dentry = file->f_path.dentry;
 	struct ovl_cache_entry *p;
 
-	/* 当ctx->pos == 0的时候需要清除目录缓存 */
+	/*
+	 * 当ctx->pos == 0的时候需要检查是有文件增加或者删除或者rename, 如果有的话清除目录缓存.
+	 * 为什么选择ctx->pos == 0的时候重建有如下原因:
+	 * 1. cache不能因为有create/delete/rename就重建,这样的开销太大.
+	 * 2. 在iterate过程中有进程创建文件/删除文件,确实会造成iterate的内容不是最新的,
+	 *    但是这个问题所有文件系统都有.
+	 * 3. 如果在ctx->pos != 0的时候rebuild缓存,ctx->pos指向的地方很可能不是之前所指向的
+	 *    目录项,整个缓存将会一片混乱.
+	 * 所以,选择ctx->pos == 0的时候,并且目录被修改的时候重建dir cache.
+	 */
 	if (!ctx->pos)
 		ovl_dir_reset(file);
 
 	if (od->is_real)
 		return iterate_dir(od->realfile, ctx);
 
-	/* 目录之前没有被打开过,本次readdir后会将目录项缓存起来 */
+	/* 目录之前没有被打开过或者ctx->pos == 0,导致cache被释放.本次readdir后会将目录项缓存起来 */
 	if (!od->cache) {
 		struct ovl_dir_cache *cache;
 
@@ -395,9 +406,11 @@ static int ovl_iterate(struct file *file, struct dir_context *ctx)
 	while (od->cursor != &od->cache->entries) {
 		p = list_entry(od->cursor, struct ovl_cache_entry, l_node);
 		if (!p->is_whiteout)
+			/* 向用户层填充信息 */
 			if (!dir_emit(ctx, p->name, p->len, p->ino, p->type))
 				break;
 		od->cursor = p->l_node.next;
+		/* 每次readdir后,需要更改文件指针 */
 		ctx->pos++;
 	}
 	return 0;
