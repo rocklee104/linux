@@ -331,8 +331,6 @@ static struct ovl_dir_cache *ovl_cache_get(struct dentry *dentry)
 		cache->refcount++;
 		return cache;
 	}
-
-	kfree(cache);
 	ovl_set_dir_cache(dentry, NULL);
 
 	cache = kzalloc(sizeof(struct ovl_dir_cache), GFP_KERNEL);
