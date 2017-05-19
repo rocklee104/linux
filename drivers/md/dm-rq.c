@@ -507,6 +507,7 @@ static int map_request(struct dm_rq_target_io *tio)
 	case DM_MAPIO_KILL:
 		/* The target wants to complete the I/O */
 		dm_kill_unmapped_request(rq, -EIO);
+		break;
 	default:
 		DMWARN("unimplemented target map return value: %d", r);
 		BUG();
@@ -720,11 +721,10 @@ int dm_old_init_request_queue(struct mapped_device *md, struct dm_table *t)
 	return 0;
 }
 
-static int dm_mq_init_request(void *data, struct request *rq,
-		       unsigned int hctx_idx, unsigned int request_idx,
-		       unsigned int numa_node)
+static int dm_mq_init_request(struct blk_mq_tag_set *set, struct request *rq,
+		unsigned int hctx_idx, unsigned int numa_node)
 {
-	return __dm_rq_init_rq(data, rq);
+	return __dm_rq_init_rq(set->driver_data, rq);
 }
 
 static int dm_mq_queue_rq(struct blk_mq_hw_ctx *hctx,
