@@ -175,10 +175,12 @@ static void ovl_instantiate(struct dentry *dentry, struct inode *inode,
 	ovl_dentry_version_inc(dentry->d_parent);
 	ovl_dentry_update(dentry, newdentry);
 	if (!hardlink) {
+		/* 新创建的inode(非硬链接)加入hash,之后创建硬链接的时候直接从hash中取 */
 		ovl_inode_update(inode, d_inode(newdentry));
 		ovl_copyattr(newdentry->d_inode, inode);
 	} else {
 		WARN_ON(ovl_inode_real(inode, NULL) != d_inode(newdentry));
+		/* 创建硬链接,单纯增加nlink */
 		inc_nlink(inode);
 	}
 	d_instantiate(dentry, inode);
