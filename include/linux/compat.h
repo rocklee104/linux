@@ -736,6 +736,7 @@ asmlinkage long compat_sys_arch_prctl(int option, unsigned long arg2);
 #ifndef in_compat_syscall
 static inline bool in_compat_syscall(void) { return is_compat_task(); }
 #endif
+static inline int is_32bit_api(void) { return in_compat_syscall(); }
 
 /**
  * ns_to_compat_timeval - Compat version of ns_to_timeval
@@ -759,6 +760,7 @@ static inline struct compat_timeval ns_to_compat_timeval(s64 nsec)
 
 #define is_compat_task() (0)
 static inline bool in_compat_syscall(void) { return false; }
+static inline int is_32bit_api(void) { return BITS_PER_LONG == 32; }
 
 #endif /* CONFIG_COMPAT */
 

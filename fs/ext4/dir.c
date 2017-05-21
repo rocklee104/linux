@@ -290,15 +290,6 @@ errout:
 	return err;
 }
 
-static inline int is_32bit_api(void)
-{
-#ifdef CONFIG_COMPAT
-	return in_compat_syscall();
-#else
-	return (BITS_PER_LONG == 32);
-#endif
-}
-
 /*
  * These functions convert from the major/minor hash to an f_pos
  * value for dx directories
