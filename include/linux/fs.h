@@ -3183,8 +3183,10 @@ static inline bool dir_emit(struct dir_context *ctx,
 {
 	return ctx->actor(ctx, name, namelen, ctx->pos, ino, type) == 0;
 }
+/* 将'.'和'..'拷贝到用户空间 */
 static inline bool dir_emit_dot(struct file *file, struct dir_context *ctx)
 {
+	/* ctx->actor一般指向filldir,filldir返回0表示成功 */
 	return ctx->actor(ctx, ".", 1, ctx->pos,
 			  file->f_path.dentry->d_inode->i_ino, DT_DIR) == 0;
 }
@@ -3198,6 +3200,7 @@ static inline bool dir_emit_dots(struct file *file, struct dir_context *ctx)
 	if (ctx->pos == 0) {
 		if (!dir_emit_dot(file, ctx))
 			return false;
+		/* 将'.'copy到用户空间成功,返回下一个位置 */
 		ctx->pos = 1;
 	}
 	if (ctx->pos == 1) {

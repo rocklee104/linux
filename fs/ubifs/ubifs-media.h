@@ -551,6 +551,7 @@ struct ubifs_dent_node {
 	__u8 padding1;
 	__u8 type;
 	__le16 nlen;
+	/* 用于支持double hash */
 	__le32 cookie;
 	__u8 name[];
 } __packed;

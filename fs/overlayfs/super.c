@@ -325,10 +325,12 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 		if (!*p)
 			continue;
 
+		/* 将命令行的参数分解,args指向了"="之后的字符串 */
 		token = match_token(p, ovl_tokens, args);
 		switch (token) {
 		case OPT_UPPERDIR:
 			kfree(config->upperdir);
+			/* args[0]中保存了"upperdir=xxx"中的xxx */
 			config->upperdir = match_strdup(&args[0]);
 			if (!config->upperdir)
 				return -ENOMEM;

@@ -487,6 +487,7 @@ static int ubifs_tmpfile(struct inode *dir, struct dentry *dentry,
  * This function converts UBIFS directory entry type into VFS directory entry
  * type.
  */
+/* 将ubifs的dent类型转换成vfs dentry type */
 static unsigned int vfs_dent_type(uint8_t type)
 {
 	switch (type) {
@@ -540,6 +541,7 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 
 	dbg_gen("dir ino %lu, f_pos %#llx", dir->i_ino, ctx->pos);
 
+	/* UBIFS的ctx->pos不能超过512M */
 	if (ctx->pos > UBIFS_S_KEY_HASH_MASK || ctx->pos == 2)
 		/*
 		 * The directory was seek'ed to a senseless position or there
@@ -556,9 +558,11 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 		if (err)
 			return err;
 
+		/* 获取文件名真实长度 */
 		fstr_real_len = fstr.len;
 	}
 
+	/* 一旦调用seek,file->version就会清0,UBIFS使用f_version来判断一个文件是否seek过 */
 	if (file->f_version == 0) {
 		/*
 		 * The file was seek'ed, which means that @file->private_data
@@ -581,21 +585,26 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 	if (ctx->pos < 2) {
 		ubifs_assert(!file->private_data);
 		if (!dir_emit_dots(file, ctx)) {
+			/* 如果copy '.'和'..'失败,需要判断文件名是否加密 */
 			if (encrypted)
 				fscrypt_fname_free_buffer(&fstr);
 			return 0;
 		}
 
+		/* copy '.'和'..'成功,目录本身的ino作为目录中最低的key */
 		/* Find the first entry in TNC and save it */
 		lowest_dent_key(c, &key, dir->i_ino);
 		fname_len(&nm) = 0;
+		/* 在TNC中找到第一个entry */
 		dent = ubifs_tnc_next_ent(c, &key, &nm);
 		if (IS_ERR(dent)) {
 			err = PTR_ERR(dent);
 			goto out;
 		}
 
+		/* 以dent的hash作为pos */
 		ctx->pos = key_hash_flash(c, &dent->key);
+		/* file->private_data中保存第一个dent */
 		file->private_data = dent;
 	}
 
@@ -605,6 +614,7 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 		 * The directory was seek'ed to and is now readdir'ed.
 		 * Find the entry corresponding to @ctx->pos or the closest one.
 		 */
+		/* 当目录被seek过,file->private_data == NULL,重新通过hash获取pos,然后重新获取first dent */
 		dent_key_init_hash(c, &key, dir->i_ino, ctx->pos);
 		fname_len(&nm) = 0;
 		dent = ubifs_tnc_next_ent(c, &key, &nm);
@@ -643,6 +653,7 @@ static int ubifs_readdir(struct file *file, struct dir_context *ctx)
 		if (!dir_emit(ctx, fstr.name, fstr.len,
 			       le64_to_cpu(dent->inum),
 			       vfs_dent_type(dent->type))) {
+			/* 将目录项copy到user space成功,直接返回 */
 			if (encrypted)
 				fscrypt_fname_free_buffer(&fstr);
 			return 0;
@@ -681,6 +692,12 @@ out:
 
 
 	/* 2 is a special value indicating that there are no more direntries */
+	/*
+	 * 对于ubifs来说:
+	 * ctx->pos = 0, 表示获取'.'
+	 * ctx->pos = 1, 表示获取'..'
+	 * ctx->pos = 2, 表示目录中没有目录项
+	 */
 	ctx->pos = 2;
 	return err;
 }

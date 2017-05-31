@@ -272,6 +272,7 @@ struct ubifs_old_idx {
 };
 
 /* The below union makes it easier to deal with keys */
+/* key的长度是64bit */
 union ubifs_key {
 	uint8_t u8[UBIFS_SK_LEN];
 	uint32_t u32[UBIFS_SK_LEN/4];

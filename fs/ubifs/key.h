@@ -174,10 +174,12 @@ static inline void dent_key_init(const struct ubifs_info *c,
  * @inum: parent inode number
  * @hash: direntry name hash
  */
+/* | dent key | hash | inum */
 static inline void dent_key_init_hash(const struct ubifs_info *c,
 				      union ubifs_key *key, ino_t inum,
 				      uint32_t hash)
 {
+	/* hash只有29bit */
 	ubifs_assert(!(hash & ~UBIFS_S_KEY_HASH_MASK));
 	key->u32[0] = inum;
 	key->u32[1] = hash | (UBIFS_DENT_KEY << UBIFS_S_KEY_HASH_BITS);
@@ -210,6 +212,7 @@ static inline void dent_key_init_flash(const struct ubifs_info *c, void *k,
  * @key: where to store the lowest key
  * @inum: parent inode number
  */
+/* dent key format: |ino|hash|0x2| */
 static inline void lowest_dent_key(const struct ubifs_info *c,
 				   union ubifs_key *key, ino_t inum)
 {
@@ -389,6 +392,7 @@ static inline uint32_t key_hash(const struct ubifs_info *c,
  * @c: UBIFS file-system description object
  * @k: the key to get hash from
  */
+/* 获取key的hash值 */
 static inline uint32_t key_hash_flash(const struct ubifs_info *c, const void *k)
 {
 	const union ubifs_key *key = k;

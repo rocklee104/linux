@@ -54,6 +54,7 @@ struct fscrypt_str {
 struct fscrypt_name {
 	const struct qstr *usr_fname;
 	struct fscrypt_str disk_name;
+	/* 64 bit hash */
 	u32 hash;
 	u32 minor_hash;
 	struct fscrypt_str crypto_buf;

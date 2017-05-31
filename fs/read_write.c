@@ -57,6 +57,7 @@ loff_t vfs_setpos(struct file *file, loff_t offset, loff_t maxsize)
 	if (offset > maxsize)
 		return -EINVAL;
 
+	/* 只要f_pos更新,f_version清0 */
 	if (offset != file->f_pos) {
 		file->f_pos = offset;
 		file->f_version = 0;
