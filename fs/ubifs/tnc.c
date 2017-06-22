@@ -1423,6 +1423,7 @@ static int maybe_leb_gced(struct ubifs_info *c, int lnum, int gc_seq1)
 	 * be sure we read the right LEB number, so read it again.
 	 */
 	smp_rmb();
+	/* gc_seq1 + 1 == gc_seq2的情况 */
 	if (gced_lnum != c->gced_lnum)
 		return 1;
 	/* Finally we can check lnum */

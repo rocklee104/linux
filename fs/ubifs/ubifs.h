@@ -1370,7 +1370,9 @@ struct ubifs_info {
 	void *sbuf;
 	struct list_head idx_gc;
 	int idx_gc_cnt;
+	/* incremented for every non-index LEB garbage collected */
 	int gc_seq;
+	/* last non-index LEB that was garbage collected */
 	int gced_lnum;
 
 	struct list_head infos_list;
