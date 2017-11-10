@@ -739,8 +739,10 @@ static void tcp_tsq_handler(struct sock *sk)
 		struct tcp_sock *tp = tcp_sk(sk);
 
 		if (tp->lost_out > tp->retrans_out &&
-		    tp->snd_cwnd > tcp_packets_in_flight(tp))
+		    tp->snd_cwnd > tcp_packets_in_flight(tp)) {
+			tcp_mstamp_refresh(tp);
 			tcp_xmit_retransmit_queue(sk);
+		}
 
 		tcp_write_xmit(sk, tcp_current_mss(sk), tp->nonagle,
 			       0, GFP_ATOMIC);
@@ -1806,40 +1808,6 @@ static bool tcp_snd_wnd_test(const struct tcp_sock *tp,
 	return !after(end_seq, tcp_wnd_end(tp));
 }
 
-/* This checks if the data bearing packet SKB (usually tcp_send_head(sk))
- * should be put on the wire right now.  If so, it returns the number of
- * packets allowed by the congestion window.
- */
-static unsigned int tcp_snd_test(const struct sock *sk, struct sk_buff *skb,
-				 unsigned int cur_mss, int nonagle)
-{
-	const struct tcp_sock *tp = tcp_sk(sk);
-	unsigned int cwnd_quota;
-
-	tcp_init_tso_segs(skb, cur_mss);
-
-	if (!tcp_nagle_test(tp, skb, cur_mss, nonagle))
-		return 0;
-
-	cwnd_quota = tcp_cwnd_test(tp, skb);
-	if (cwnd_quota && !tcp_snd_wnd_test(tp, skb, cur_mss))
-		cwnd_quota = 0;
-
-	return cwnd_quota;
-}
-
-/* Test if sending is allowed right now. */
-bool tcp_may_send_now(struct sock *sk)
-{
-	const struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *skb = tcp_send_head(sk);
-
-	return skb &&
-		tcp_snd_test(sk, skb, tcp_current_mss(sk),
-			     (tcp_skb_is_last(sk, skb) ?
-			      tp->nonagle : TCP_NAGLE_PUSH));
-}
-
 /* Trim TSO SKB to LEN bytes, put the remaining data into a new packet
  * which is put after SKB on the list.  It is very much like
  * tcp_fragment() except that it may make several kinds of assumptions
@@ -2094,6 +2062,7 @@ static int tcp_mtu_probe(struct sock *sk)
 	nskb->ip_summed = skb->ip_summed;
 
 	tcp_insert_write_queue_before(nskb, skb, sk);
+	tcp_highest_sack_replace(sk, skb, nskb);
 
 	len = 0;
 	tcp_for_write_queue_from_safe(skb, next, sk) {
@@ -2271,6 +2240,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 	sent_pkts = 0;
 
+	tcp_mstamp_refresh(tp);
 	if (!push_one) {
 		/* Do MTU probing. */
 		result = tcp_mtu_probe(sk);
@@ -2282,7 +2252,6 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 	}
 
 	max_segs = tcp_tso_segs(sk, mss_now);
-	tcp_mstamp_refresh(tp);
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
 
@@ -2697,7 +2666,7 @@ static bool tcp_collapse_retrans(struct sock *sk, struct sk_buff *skb)
 		else if (!skb_shift(skb, next_skb, next_skb_size))
 			return false;
 	}
-	tcp_highest_sack_combine(sk, next_skb, skb);
+	tcp_highest_sack_replace(sk, next_skb, skb);
 
 	tcp_unlink_write_queue(next_skb, sk);
 
@@ -2875,8 +2844,10 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 		nskb = __pskb_copy(skb, MAX_TCP_HEADER, GFP_ATOMIC);
 		err = nskb ? tcp_transmit_skb(sk, nskb, 0, GFP_ATOMIC) :
 			     -ENOBUFS;
-		if (!err)
+		if (!err) {
 			skb->skb_mstamp = tp->tcp_mstamp;
+			tcp_rate_skb_sent(sk, skb);
+		}
 	} else {
 		err = tcp_transmit_skb(sk, skb, 1, GFP_ATOMIC);
 	}
@@ -3209,13 +3180,8 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 	th->source = htons(ireq->ir_num);
 	th->dest = ireq->ir_rmt_port;
 	skb->mark = ireq->ir_mark;
-	/* Setting of flags are superfluous here for callers (and ECE is
-	 * not even correctly set)
-	 */
-	tcp_init_nondata_skb(skb, tcp_rsk(req)->snt_isn,
-			     TCPHDR_SYN | TCPHDR_ACK);
-
-	th->seq = htonl(TCP_SKB_CB(skb)->seq);
+	skb->ip_summed = CHECKSUM_PARTIAL;
+	th->seq = htonl(tcp_rsk(req)->snt_isn);
 	/* XXX data is queued and acked as is. No buffer/window check */
 	th->ack_seq = htonl(tcp_rsk(req)->rcv_nxt);
 
@@ -3423,6 +3389,10 @@ static int tcp_send_syn_data(struct sock *sk, struct sk_buff *syn)
 		goto done;
 	}
 
+	/* data was not sent, this is our new send_head */
+	sk->sk_send_head = syn_data;
+	tp->packets_out -= tcp_skb_pcount(syn_data);
+
 fallback:
 	/* Send a regular SYN with Fast Open cookie request option */
 	if (fo->cookie.len > 0)
@@ -3475,6 +3445,11 @@ int tcp_connect(struct sock *sk)
 	 */
 	tp->snd_nxt = tp->write_seq;
 	tp->pushed_seq = tp->write_seq;
+	buff = tcp_send_head(sk);
+	if (unlikely(buff)) {
+		tp->snd_nxt	= TCP_SKB_CB(buff)->seq;
+		tp->pushed_seq	= TCP_SKB_CB(buff)->seq;
+	}
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
 
 	/* Timer for repeating the SYN until an answer. */

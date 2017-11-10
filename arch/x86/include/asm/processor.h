@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef _ASM_X86_PROCESSOR_H
 #define _ASM_X86_PROCESSOR_H
 
@@ -677,8 +678,6 @@ static inline void sync_core(void)
 	 * Like all of Linux's memory ordering operations, this is a
 	 * compiler barrier as well.
 	 */
-	register void *__sp asm(_ASM_SP);
-
 #ifdef CONFIG_X86_32
 	asm volatile (
 		"pushfl\n\t"
@@ -686,7 +685,7 @@ static inline void sync_core(void)
 		"pushl $1f\n\t"
 		"iret\n\t"
 		"1:"
-		: "+r" (__sp) : : "memory");
+		: ASM_CALL_CONSTRAINT : : "memory");
 #else
 	unsigned int tmp;
 
@@ -703,7 +702,7 @@ static inline void sync_core(void)
 		"iretq\n\t"
 		UNWIND_HINT_RESTORE
 		"1:"
-		: "=&r" (tmp), "+r" (__sp) : : "cc", "memory");
+		: "=&r" (tmp), ASM_CALL_CONSTRAINT : : "cc", "memory");
 #endif
 }
 

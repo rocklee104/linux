@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  *    Copyright IBM Corp. 2007, 2009
  *    Author(s): Hongjie Yang <hongjie@us.ibm.com>,
@@ -403,18 +404,6 @@ static inline void save_vector_registers(void)
 		save_vx_regs(boot_cpu_vector_save_area);
 #endif
 }
-
-static int __init topology_setup(char *str)
-{
-	bool enabled;
-	int rc;
-
-	rc = kstrtobool(str, &enabled);
-	if (!rc && !enabled)
-		S390_lowcore.machine_flags &= ~MACHINE_FLAG_TOPOLOGY;
-	return rc;
-}
-early_param("topology", topology_setup);
 
 static int __init disable_vector_extension(char *str)
 {
