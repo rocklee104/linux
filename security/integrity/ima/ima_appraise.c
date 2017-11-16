@@ -210,8 +210,13 @@ int ima_appraise_measurement(enum ima_hooks func,
 	enum integrity_status status = INTEGRITY_UNKNOWN;
 	int rc = xattr_len, hash_start = 0;
 
-	if (!(inode->i_opflags & IOP_XATTR))
-		return INTEGRITY_UNKNOWN;
+	if (!(inode->i_opflags & IOP_XATTR)) {
+		cause = "xattrs-unsupported";
+		status = INTEGRITY_UNKNOWN;
+		integrity_audit_msg(AUDIT_INTEGRITY_DATA, inode, filename,
+					op, cause, rc, 0);
+		return status;
+	}
 
 	if (rc <= 0) {
 		if (rc && rc != -ENODATA)
